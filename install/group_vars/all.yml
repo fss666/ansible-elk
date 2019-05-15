@@ -2,7 +2,7 @@
 
 # Default Ansible user
 # change this if you use a non-root user for running Ansible playbooks
-ansible_system_user: root
+ansible_system_user: ansible
 
 # EPEL Repository for extra packages
 epel_repo: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
@@ -72,7 +72,12 @@ fluentd_debug_port: 24230
 # to true
 # we will set this to false by default
 es_local_port: 9200
-es_listen_external: false
+es_listen_external: true
+
+### elasticsearch cluster informations
+# elk-cluster-name
+elkclustername: elkcl22
+
 ### install curator tool ###
 # curator is the recommended tool for managing elasticsearch indexes
 # https://www.elastic.co/guide/en/elasticsearch/client/curator/current/index.html
@@ -98,9 +103,9 @@ install_kibana_xpack: false
 install_logstash_xpack: false
 
 #Install Metricbeat
-install_metricbeat: false
+install_metricbeat: true
 #Install Packetbeat
-install_packetbeat: false
+install_packetbeat: true
 
 #This should be installed on only one server in your environment.
 #Install Heartbeat

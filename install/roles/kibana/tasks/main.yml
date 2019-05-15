@@ -14,14 +14,22 @@
     mode=0644
   become: true
 
-- name: Install kibana rpms
+- name: Install kibana rpms, and pyOpenSSL e python-passlib Ansible requirements
   yum:
-    name: [kibana, unzip]
+    name: [kibana, unzip, python-passlib, python-cryptography]
+    state: present
+  become: true
+
+- name: teste
+  yum:
+    name: ftp://ftp.icm.edu.pl/vol/rzm6/linux-centos-vault/7.4.1708/cloud/x86_64/openstack-newton/common/pyOpenSSL-0.15.1-1.el7.noarch.rpm
+    state: present
   become: true
 
 - name: Install local rsyslogd for fluentd
   yum:
     name: rsyslog
+    state: present
   become: true
   when: (logging_backend == 'fluentd')
 
@@ -33,31 +41,28 @@
   become: true
 
 - name: Populate elasticsearch index with local logs via rsyslog
-  command: systemctl restart rsyslog.service
+  systemd: name=rsyslog state=restarted
   ignore_errors: true
-  when: rsyslog_updated != 0
+  when: rsyslog_updated.changed
   become: true
 
-- name: Check kibana users
-  stat: path=/etc/nginx/htpasswd.users
-  ignore_errors: true
-  register: kibana_user_pwfile_exists
-  become: true
+# - name: Check kibana users
+#   stat: path=/etc/nginx/htpasswd.users
+#   ignore_errors: true
+#   register: kibana_user_pwfile_exists
+#   become: true
 
-- name: Create kibana admin user
-  command: htpasswd -b -c /etc/nginx/htpasswd.users {{kibana_user}} {{kibana_password}}
+- name: Create kibana admin user (htpasswd)
+  htpasswd: 
+    path: /etc/nginx/htpasswd.users
+    name: "{{kibana_user}}"
+    password: "{{kibana_password}}"
   ignore_errors: true
-  when: kibana_user_pwfile_exists != 0
+  # when: kibana_user_pwfile_exists != 0
   become: true
 
 - name: Setup kibana service
   service: name=kibana state=started enabled=true
-  become: true
-
-- name: Check Filebeat forwarder SSL certificate
-  stat: path=/usr/share/logstash/beat-forwarder.crt
-  ignore_errors: true
-  register: filebeat_forwarder_ssl_exists
   become: true
 
 - name: Create SSL structure for Fluentd installs
@@ -67,30 +72,60 @@
   when: (logging_backend == 'fluentd')
   become: true
 
+
+- name: Ensure that the existing certificate is still valid 2 weeks (1209600 seconds) from now
+  openssl_certificate:
+    path: /usr/share/logstash/beat-forwarder.crt
+    provider: assertonly
+    valid_in: 1209600
+  register: certificate_valid
+  ignore_errors: true 
+  become: true
+
+- debug: msg="{{certificate_valid}}"
+
+# - name: Check Filebeat forwarder SSL certificate
+#   stat: path=/usr/share/logstash/beat-forwarder.crt
+#   ignore_errors: true
+#   register: filebeat_forwarder_ssl_exists
+#   become: true
+
 - name: Create client forwarder SSL certificate
   command: openssl req -subj '/CN={{ ansible_fqdn }}/' -config /etc/pki/tls/openssl_extras.cnf \
     -x509 -days 3650 -batch -nodes -newkey rsa:2048 -keyout /usr/share/logstash/beat-forwarder.key \
     -out /usr/share/logstash/beat-forwarder.crt
+  # openssl_certificate:
+  #   path: /usr/share/logstash/beat-forwarder.crt
+  #   privatekey_path: /usr/share/logstash/beat-forwarder.key
+  #   subject: "/CN={{ ansible_fqdn }}/"
   ignore_errors: true
-  when: (filebeat_forwarder_ssl_exists != 0)
+  # when: (filebeat_forwarder_ssl_exists != 0)
+  #when:  certificate_valid.msg.find("Certificate is not valid in") != -1
+  when: certificate_valid.failed
   become: true
 
-- name: Check Filebeat forwarder SSL certificate copy
-  stat: path=/usr/share/nginx/html/beat-forwarder.crt
-  ignore_errors: true
-  register: filebeat_forwarder_ssl_client_copy_exists
-  become: true
+# - name: Check Filebeat forwarder SSL certificate copy
+#   stat: path=/usr/share/nginx/html/beat-forwarder.crt
+#   ignore_errors: true
+#   register: filebeat_forwarder_ssl_client_copy_exists
+#   become: true
 
 - name: Copy Filebeat forwarder SSL certificate
-  command: cp /usr/share/logstash/beat-forwarder.crt /usr/share/nginx/html/beat-forwarder.crt
+  copy:
+    remote_src: yes
+    src: /usr/share/logstash/beat-forwarder.crt
+    dest: /usr/share/nginx/html/beat-forwarder.crt
   ignore_errors: true
-  when: (filebeat_forwarder_ssl_client_copy_exists != 0)
+  # when: (filebeat_forwarder_ssl_client_copy_exists != 0)
   become: true
 
 - name: Copy Filebeat forwarder SSL certificate key
-  command: cp /usr/share/logstash/beat-forwarder.key /usr/share/nginx/html/beat-forwarder.key
+  copy:
+    remote_src: yes
+    src: /usr/share/logstash/beat-forwarder.key
+    dest: /usr/share/nginx/html/beat-forwarder.key
   ignore_errors: true
-  when: (filebeat_forwarder_ssl_client_copy_exists != 0)
+  # when: (filebeat_forwarder_ssl_client_copy_exists != 0)
   become: true
 
 - name: Set permissions on logstash certificate
@@ -195,12 +230,12 @@
   become: true
 
 - name: Restart rsyslogd to populate elasticsearch index
-  command: systemctl restart rsyslog.service
+  systemd: name=rsyslog state=restarted
   ignore_errors: true
-  when: rsyslog_updated != 0
+  when: rsyslog_updated.changed
   become: true
 
 - name: Refresh fluentd service
-  command: systemctl restart td-agent.service
+  systemd: name=td-agent state=restarted
   when: (logging_backend == 'fluentd')
   become: true

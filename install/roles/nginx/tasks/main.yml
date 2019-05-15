@@ -33,8 +33,8 @@
     owner=root
     group=root
     mode=0644
+  register: nginx_kibana
   become: true
-  register: nginx_needs_restart
 
 # deploy basic nginx.conf 8080 vhost
 - name: Setup nginx TCP/8080 vhost for SSL certificate
@@ -44,22 +44,54 @@
     owner=root
     group=root
     mode=0644
+  register: nginx_basic_vhost
   become: true
+
+# - name: debuging varibles
+#   debug:
+#     var: nginx_basic_vhost
 
 # start nginx service
 - name: Start nginx service
-  command: systemctl restart nginx.service
+  systemd: name=nginx state=started
+  register: nginx_started
+  become: true
+
+# - name: debuging varibles
+#   debug:
+#     var: nginx_started
+
+
+# restart nginx service (only if need)
+- name: Restart nginx service (only if need)
+  systemd: name=nginx state=restarted
   ignore_errors: true
-  when: nginx_needs_restart != 0
+  when: ((nginx_started.changed == false) and (nginx_kibana.changed or nginx_basic_vhost.changed))
   become: true
 
 - name: Set nginx to start on boot
-  command: systemctl enable nginx.service
+  systemd: name=nginx enabled=yes
   ignore_errors: true
   become: true
 
-# we only want to enable EPEL for some packages
-- name: Remove EPEL Repo
-  yum: name={{epel_repo}}
-      state=absent
+- name: Enable firewall ports
+  firewalld:
+    port:  "{{ item }}"
+    zone: public
+    state: enabled
+    permanent: yes
+    immediate: yes
+  with_list:
+    - 80/tcp
+    - 8080/tcp
+  tags:
+    - fwconfig
+    - firewall
   become: true
+
+
+# we only want to enable EPEL for some packages
+# - name: Remove EPEL Repo
+#   yum: name={{epel_repo}}
+#       state=absent
+#   become: true

@@ -3,6 +3,21 @@
 # Install/run elasticsearch
 #
 
+
+# - name: Dump all vars
+#   action: template src=elasticsearch.yml.j2 dest=/tmp/ansible.all
+
+# - name: Display all variables/facts known for a host
+#   debug:
+#     var: hostvars[inventory_hostname]
+#   tags: debug_info
+
+- name: Import GPG-KEY for elasticsearch
+  rpm_key:
+    state: present
+    key: https://packages.elastic.co/GPG-KEY-elasticsearch
+  become: true
+
 - name: Install libsemanage-python and dependencies
   yum:
     name: libsemanage-python
@@ -20,6 +35,7 @@
 - name: Install elasticsearch and openjdk
   yum:
     name: [elasticsearch, java-openjdk-headless]
+    state: present
   become: true
 
 - name: Copy templated elasticsearch.yml
@@ -30,6 +46,8 @@
     group=elasticsearch
     mode=0660
   become: true
+  # register: elasticsearch_updated
+  notify: "restart elasticsearch services"
   ignore_errors: true
 
 - name: Check if system memory is greater than 64G
@@ -39,19 +57,22 @@
 
 - name: Apply heapsize start tuning for systems with greater than 64G memory
   lineinfile:
-    path=/etc/elasticsearch/jvm.options
-    regexp='^-Xms1g'
+    dest=/etc/elasticsearch/jvm.options
+    regexp='^-Xms\d*[m|g]'
     line='-Xms31g'
   when: ansible_memory_mb.real.total|int >= 65536
+  # register: elasticsearch_updated
+  notify: "restart elasticsearch services"
   become: true
 
 - name: Apply heapsize end tuning for systems with greater than 64G memory
   lineinfile:
-    path=/etc/elasticsearch/jvm.options
-    regexp='^-Xmx1g'
+    dest=/etc/elasticsearch/jvm.options
+    regexp='^-Xmx\d*[m|g]'
     line='-Xmx31g'
   when: ansible_memory_mb.real.total|int >= 65536
-  register: elasticsearch_updated
+  # register: elasticsearch_updated
+  notify: "restart elasticsearch services"
   become: true
 
 - name: Print extended documentation for heapsize tuning
@@ -60,38 +81,41 @@
   become: true
 
 - name: Update elasticsearch startup with start heap size
-  become: true
   lineinfile:
-    path=/etc/elasticsearch/jvm.options
-    regexp='^-Xms1g'
-    line='-Xms{{ (ansible_memory_mb.real.total / 2) | int }}m'
+    path: /etc/elasticsearch/jvm.options
+    regexp: '^-Xms\d*[m|g]'
+    line: '-Xms{{ (ansible_memory_mb.real.total / 2) | int }}m'
   when: ansible_memory_mb.real.total|int < 65536
+  # register: elasticsearch_updated
+  notify: "restart elasticsearch services"
+  become: true
 
 - name: Update elasticsearch startup with end heap size
-  become: true
   lineinfile:
-    path=/etc/elasticsearch/jvm.options
-    regexp='^-Xmx1g'
-    line='-Xmx{{ (ansible_memory_mb.real.total / 2) | int }}m'
+    dest: /etc/elasticsearch/jvm.options
+    regexp: '^-Xmx\d*[m|g]'
+    line: '-Xmx{{ (ansible_memory_mb.real.total / 2) | int }}m'
   when: ansible_memory_mb.real.total|int < 65536
-  register: elasticsearch_updated
-
-- name: Apply workaround for java listening port
-  raw: setcap 'cap_net_bind_service=+ep' /usr/lib/jvm/java-1.8.*openjdk-*/jre/bin/java
+  # register: elasticsearch_updated
+  notify: "restart elasticsearch services"
   become: true
+
+# - name: Apply workaround for java listening port
+#   raw: setcap 'cap_net_bind_service=+ep' /usr/lib/jvm/java-1.8.*openjdk-*/jre/bin/java
+#   become: true
 
 # https://www.centos.org/forums/viewtopic.php?t=16398
-- name: Obtain exact version of JRE for libjli.so workaround
-  shell: "ls /usr/lib/jvm/ | grep java | grep openjdk-1"
-  register: libjli_location
-  become: true
+# - name: Obtain exact version of JRE for libjli.so workaround
+#   shell: "ls /usr/lib/jvm/ | grep java | grep openjdk-1"
+#   register: libjli_location
+#   become: true
 
-- name: Apply EL symlink workaround for libjli.so
-  file:
-    src='/usr/lib/jvm/{{libjli_location.stdout}}/jre/lib/amd64/jli/libjli.so'
-    dest='/lib64/libjli.so'
-    state=link
-  become: true
+# - name: Apply EL symlink workaround for libjli.so
+#   file:
+#     src='/usr/lib/jvm/{{libjli_location.stdout}}/jre/lib/amd64/jli/libjli.so'
+#     dest='/lib64/libjli.so'
+#     state=link
+#   become: true
 
 # this seems like a packaging bug for 6.x
 - name: Create log directory structure for ES
@@ -101,6 +125,7 @@
     owner: elasticsearch
     group: elasticsearch
     mode: 0755
+  become: true
 
 # another packaging bug, this should be done by RPM
 - name: Create datadir for elasticsearch
@@ -110,13 +135,44 @@
     owner: elasticsearch
     group: elasticsearch
     mode: 0755
+  become: true
 
-- name: Start or restart elasticsearch service
-  command: systemctl restart elasticsearch.service
-  ignore_errors: true
-  when: elasticsearch_updated != 0
+# - debug: msg="{{ elasticsearch_updated.changed }}"
+
+
+# - name: Restart elasticsearch service
+#   systemd: name=elasticsearch state=restarted 
+#   ignore_errors: false
+#   when: elasticsearch_updated.changed
+#   become: true
+
+- name: Start elasticsearch service
+  systemd: name=elasticsearch state=started 
+  ignore_errors: false
   become: true
 
 - name: Setup elasticsearch service to autostart
   service: name=elasticsearch state=started enabled=true
   become: true
+
+- name: Enable firewall ports
+  firewalld:
+    port: "{{item}}"
+    zone: public
+    state: enabled
+    permanent: yes
+    immediate: yes
+  with_list:
+    - 9200/tcp
+    - 9300/tcp
+  tags:
+    - fwconfig
+    - firewall
+  become: true
+
+# - name: Waits for port 9200 of any IP to close active connections, don't start checking for 10 seconds
+#   wait_for:
+#     host: 0.0.0.0
+#     port: 9200
+#     delay: 10
+#     state: started # drained / stopped / present / absent

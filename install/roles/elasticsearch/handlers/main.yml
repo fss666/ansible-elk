@@ -1,0 +1,10 @@
+
+---
+- name: restart elasticsearch
+  become: true
+  systemd: name=elasticsearch state=restarted
+  listen: "restart elasticsearch services"
+
+- name: wait elasticsearch restart
+  wait_for: host={{ ansible_hostname }} port=9200 delay=10 state=started # drained / stopped / present / absent
+  listen: "restart elasticsearch services"

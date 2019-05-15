@@ -14,13 +14,13 @@
 #
 # Use a descriptive name for your cluster:
 #
-#cluster.name: my-application
+cluster.name: {{ elkclustername | default('elknovo', true) }}
 #
 # ------------------------------------ Node ------------------------------------
 #
 # Use a descriptive name for the node:
 #
-#node.name: node-1
+node.name: {{ ansible_hostname }}
 #
 # Add custom attributes to the node:
 #
@@ -53,7 +53,7 @@
 # Set the bind address to a specific IP (IPv4 or IPv6):
 #
 {% if es_listen_external %}
-network.host: 0.0.0.0 
+network.host: 0.0.0.0
 {% endif %}
 {% if not es_listen_external %}
 #network.host: {{ ansible_default_ipv4.address }}
@@ -71,10 +71,33 @@ network.host: 0.0.0.0
 # The default list of hosts is ["127.0.0.1", "[::1]"]
 #
 #discovery.zen.ping.unicast.hosts: ["host1", "host2"]
+
+discovery.zen.ping.unicast.hosts: [
+{% for host in groups['elk-master'] | union(groups['elk-slaves']) %}
+   "{{hostvars[host].inventory_hostname}}", 
+{% endfor %}
+]
+
 #
 # Prevent the "split brain" by configuring the majority of nodes (total number of master-eligible nodes / 2 + 1):
 #
 #discovery.zen.minimum_master_nodes: 3
+#
+#
+# Documentation: https://www.elastic.co/guide/en/elasticsearch/reference/current/modules-node.html 
+#
+#To create a dedicated master-eligible node, set:
+#node.master: true 
+#node.data: false 
+#node.ingest: false 
+#cluster.remote.connect: false 
+#
+#To create a dedicated data node, set:
+#
+#node.master: false 
+#node.data: true 
+#node.ingest: false 
+#cluster.remote.connect: false 
 #
 # For more information, consult the zen discovery module documentation.
 #
