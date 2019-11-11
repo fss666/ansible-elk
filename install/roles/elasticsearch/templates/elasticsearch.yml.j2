@@ -72,8 +72,15 @@ network.host: 0.0.0.0
 #
 #discovery.zen.ping.unicast.hosts: ["host1", "host2"]
 
-discovery.zen.ping.unicast.hosts: [
+{# discovery.zen.ping.unicast.hosts: [
 {% for host in groups['elk-master'] | union(groups['elk-slaves']) %}
+   "{{hostvars[host].inventory_hostname}}", 
+{% endfor %}
+] 
+#}
+
+discovery.zen.ping.unicast.hosts: [
+{% for host in groups['elk-master'] %}
    "{{hostvars[host].inventory_hostname}}", 
 {% endfor %}
 ]

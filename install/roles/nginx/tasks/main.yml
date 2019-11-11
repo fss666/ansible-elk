@@ -3,10 +3,10 @@
 # Install/run nginx
 #
 
-- name: Check/Install EPEL Repo for nginx
-  yum: name={{epel_repo}}
-      state=present
-  become: true
+# - name: Check/Install EPEL Repo for nginx
+#   yum: name={{epel_repo}}
+#       state=present
+#   become: true
 
 - name: Install nginx, httpd-tools, httplib2
   yum:
@@ -16,6 +16,7 @@
 # SELinux boolean for nginx
 - name: Apply SELinux boolean httpd_can_network_connect
   seboolean: name=httpd_can_network_connect state=yes persistent=yes
+  when: ansible_selinux is defined and ansible_selinux.status == 'enabled'
   become: true
 
 # create /etc/nginx/conf.d/ directory
@@ -87,6 +88,7 @@
   tags:
     - fwconfig
     - firewall
+  when: manage_firewall
   become: true
 
 

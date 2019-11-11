@@ -20,11 +20,11 @@
     state: present
   become: true
 
-- name: teste
-  yum:
-    name: ftp://ftp.icm.edu.pl/vol/rzm6/linux-centos-vault/7.4.1708/cloud/x86_64/openstack-newton/common/pyOpenSSL-0.15.1-1.el7.noarch.rpm
-    state: present
-  become: true
+# - name: teste
+#   yum:
+#     name: ftp://ftp.icm.edu.pl/vol/rzm6/linux-centos-vault/7.4.1708/cloud/x86_64/openstack-newton/common/pyOpenSSL-0.15.1-1.el7.noarch.rpm
+#     state: present
+#   become: true
 
 - name: Install local rsyslogd for fluentd
   yum:

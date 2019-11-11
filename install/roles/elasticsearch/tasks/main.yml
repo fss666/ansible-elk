@@ -168,6 +168,7 @@
   tags:
     - fwconfig
     - firewall
+  when: manage_firewall
   become: true
 
 # - name: Waits for port 9200 of any IP to close active connections, don't start checking for 10 seconds

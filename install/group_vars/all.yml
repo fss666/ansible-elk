@@ -2,7 +2,7 @@
 
 # Default Ansible user
 # change this if you use a non-root user for running Ansible playbooks
-ansible_system_user: ansible
+ansible_system_user: ansiblegeit
 
 # EPEL Repository for extra packages
 epel_repo: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
@@ -23,7 +23,7 @@ epel_repo: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rp
 # as the current firewall code will detect this and leave it alone.
 # if you really, really want to disable checking/applying service firewall rules
 # then change to 'false' or empty
-manage_firewall: true
+manage_firewall: false
 
 ### nginx ###
 # add nonstandard port here for undercloud usage
@@ -76,7 +76,7 @@ es_listen_external: true
 
 ### elasticsearch cluster informations
 # elk-cluster-name
-elkclustername: elkcl22
+elkclustername: anacgesi
 
 ### install curator tool ###
 # curator is the recommended tool for managing elasticsearch indexes

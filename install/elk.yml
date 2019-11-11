@@ -25,16 +25,16 @@
     - { role: instructions, tags: instructions }
 
 
-- hosts: elk-slaves
-  remote_user: "{{ ansible_system_user }}"
-  vars_files:
-    - group_vars/all.yml
-  roles:
-    - { role: elasticsearch,  tags: elastic }
+# - hosts: elk-slaves
+#   remote_user: "{{ ansible_system_user }}"
+#   vars_files:
+#     - group_vars/all.yml
+#   roles:
+#     - { role: elasticsearch,  tags: elastic }
 
-- hosts: elk-client
-  remote_user: "{{ ansible_system_user }}"
-  vars_files:
-    - group_vars/all.yml
-  roles:
-    - { role: metricbeat,  tags: metricbeat }
+# - hosts: elk-client
+#   remote_user: "{{ ansible_system_user }}"
+#   vars_files:
+#     - group_vars/all.yml
+#   roles:
+#     - { role: metricbeat,  tags: metricbeat }
